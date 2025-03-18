@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="chat-container d-flex flex-column h-100">
+    <div class="chat-header bg-light p-3 d-flex justify-content-between align-items-center">
+        <h4>与 Mistral AI 对话</h4>
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-primary" id="toggleTextChat">
+                <i class="bi bi-chat-text me-1"></i> 文本对话
+            </button>
+            <button class="btn btn-outline-primary" id="toggleImageChat">
+                <i class="bi bi-image me-1"></i> 图片对话
+            </button>
+        </div>
+    </div>
+    
+    <div class="chat-messages flex-grow-1 p-3 overflow-auto" id="chatMessages">
+        {% if chat and chat.messages %}
+            {% for message in chat.messages %}
+                <div class="message {% if message.role == 'user' %}user-message{% else %}assistant-message{% endif %} mb-3">
+                    <div class="message-header">
+                        <strong>{{ '你' if message.role == 'user' else 'Mistral AI' }}</strong>
+                        <small class="text-muted">{{ message.timestamp }}</small>
+                    </div>
+                    <div class="message-content">
+                        {% if '[图片]' in message.content and message.role == 'user' %}
+                            <div class="user-image-content">
+                                <p>{{ message.content.replace('[图片] ', '') }}</p>
+                                <div class="image-placeholder">
+                                    <i class="bi bi-image"></i> 图片已上传
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="markdown-content">{{ message.content }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-chat text-center my-5">
+                <div class="mb-4">
+                    <i class="bi bi-robot fs-1"></i>
+                </div>
+                <h3>开始新的对话</h3>
+                <p class="text-muted">选择文本对话或图片对话与Mistral AI交流</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="chat-input-container p-3 border-top">
+        <!-- 文本聊天表单 -->
+        <form id="textChatForm" method="post" action="{{ url_for('text_chat') }}" class="mb-0">
+            {{ text_form.csrf_token }}
+            <div class="input-group">
+                {{ text_form.message(class="form-control", placeholder="输入消息...", id="textChatMessage", autocomplete="off") }}
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i>
+                </button>
+            </div>
+        </form>
+        
+        <!-- 图片聊天表单 -->
+        <form id="imageChatForm" method="post" action="{{ url_for('image_chat') }}" 
+              enctype="multipart/form-data" class="mb-0 d-none">
+            {{ image_form.csrf_token }}
+            <div class="image-preview mb-2 d-none">
+                <img id="uploadPreview" class="img-thumbnail" style="max-height: 200px;" alt="预览图片">
+                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" id="clearImage">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="input-group">
+                {{ image_form.message(class="form-control", placeholder="关于图片的问题...", id="imageChatMessage", autocomplete="off") }}
+                <label for="image" class="btn btn-secondary">
+                    <i class="bi bi-image"></i>
+                </label>
+                {{ image_form.image(class="d-none", id="image") }}
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 初始化Markdown渲染
+        document.querySelectorAll('.markdown-content').forEach(function(el) {
+            el.innerHTML = marked.parse(el.textContent);
+        });
+        
+        // 聊天区域滚动到底部
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // 切换聊天表单
+        document.getElementById('toggleTextChat').addEventListener('click', function() {
+            document.getElementById('textChatForm').classList.remove('d-none');
+            document.getElementById('imageChatForm').classList.add('d-none');
+            this.classList.add('active');
+            document.getElementById('toggleImageChat').classList.remove('active');
+        });
+        
+        document.getElementById('toggleImageChat').addEventListener('click', function() {
+            document.getElementById('imageChatForm').classList.remove('d-none');
+            document.getElementById('textChatForm').classList.add('d-none');
+            this.classList.add('active');
+            document.getElementById('toggleTextChat').classList.remove('active');
+        });
+        
+        // 文本聊天提交处理
+        document.getElementById('textChatForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const messageInput = document.getElementById('textChatMessage');
+            const message = messageInput.value.trim();
+            
+            if (message) {
+                // 显示用户消息
+                appendMessage('user', message);
+                
+                // 显示加载状态
+                const loadingMessage = appendMessage('assistant', '<div class="spinner-border spinner-border-sm" role="status"></div> 正在思考...');
+                
+                // 发送Ajax请求
+                fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: new URLSearchParams(new FormData(this))
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 移除加载消息
+                    loadingMessage.remove();
+                    
+                    if (data.status === 'success') {
+                        // 显示助手回复
+                        appendMessage('assistant', data.response);
+                    } else {
+                        // 显示错误
+                        appendMessage('system', `错误: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    loadingMessage.remove();
+                    appendMessage('system', `发生错误: ${error.message}`);
+                });
+                
+                // 清空输入框
+                messageInput.value = '';
+            }
+        });
+        
+        // 图片聊天提交处理
+        document.getElementById('imageChatForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const messageInput = document.getElementById('imageChatMessage');
+            const imageInput = document.getElementById('image');
+            const message = messageInput.value.trim();
+            
+            if (message && imageInput.files.length > 0) {
+                // 显示用户消息
+                appendMessage('user', `<p>${message}</p><div class="image-placeholder"><i class="bi bi-image"></i> 图片已上传</div>`);
+                
+                // 显示加载状态
+                const loadingMessage = appendMessage('assistant', '<div class="spinner-border spinner-border-sm" role="status"></div> 正在分析图片...');
+                
+                // 发送Ajax请求
+                fetch(this.action, {
+                    method: 'POST',
+                    body: new FormData(this)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 移除加载消息
+                    loadingMessage.remove();
+                    
+                    if (data.status === 'success') {
+                        // 显示助手回复
+                        appendMessage('assistant', data.response);
+                    } else {
+                        // 显示错误
+                        appendMessage('system', `错误: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    loadingMessage.remove();
+                    appendMessage('system', `发生错误: ${error.message}`);
+                });
+                
+                // 清空输入框和图片
+                messageInput.value = '';
+                imageInput.value = '';
+                document.querySelector('.image-preview').classList.add('d-none');
+            }
+        });
+        
+        // 图片预览功能
+        document.getElementById('image').addEventListener('change', function(e) {
+            const preview = document.getElementById('uploadPreview');
+            const previewContainer = document.querySelector('.image-preview');
+            
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    previewContainer.classList.remove('d-none');
+                };
+                
+                reader.readAsDataURL(this.files[0]);
+            }
+        });
+        
+        // 清除图片按钮
+        document.getElementById('clearImage').addEventListener('click', function() {
+            document.getElementById('image').value = '';
+            document.querySelector('.image-preview').classList.add('d-none');
+        });
+    });
+    
+    // 追加消息到聊天区域
+    function appendMessage(role, content) {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}-message mb-3`;
+        
+        const messageHeader = document.createElement('div');
+        messageHeader.className = 'message-header';
+        
+        const headerText = document.createElement('strong');
+        headerText.textContent = role === 'user' ? '你' : (role === 'assistant' ? 'Mistral AI' : '系统');
+        
+        const timestamp = document.createElement('small');
+        timestamp.className = 'text-muted';
+        timestamp.textContent = new Date().toLocaleTimeString();
+        
+        messageHeader.appendChild(headerText);
+        messageHeader.appendChild(timestamp);
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        
+        if (role !== 'system') {
+            const markdownContent = document.createElement('div');
+            markdownContent.className = 'markdown-content';
+            
+            if (content.includes('<div class="spinner-border')) {
+                markdownContent.innerHTML = content;
+            } else {
+                markdownContent.innerHTML = marked.parse(content);
+            }
+            
+            messageContent.appendChild(markdownContent);
+        } else {
+            messageContent.innerHTML = `<div class="alert alert-danger">${content}</div>`;
+        }
+        
+        messageDiv.appendChild(messageHeader);
+        messageDiv.appendChild(messageContent);
+        
+        // 移除空聊天提示
+        const emptyChat = chatMessages.querySelector('.empty-chat');
+        if (emptyChat) {
+            emptyChat.remove();
+        }
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        return messageDiv;
+    }
+    
+    // 删除聊天会话
+    function deleteChat(chatId) {
+        if (confirm('确定要删除这个聊天会话吗？')) {
+            fetch(`/chat/delete/${chatId}`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert('删除失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('发生错误: ' + error.message);
+            });
+        }
+    }
+</script>
+{% endblock %} 

@@ -1,0 +1,57 @@
+# Python字节码文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.env
+
+# IDE配置
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 运行时和日志文件
+instance/
+.webassets-cache
+logs/
+*.log
+
+# 上传的图片文件
+static/uploads/
+
+# 聊天历史记录
+chat_history/
+
+# Flask特有
+app/static/.webassets-cache
+
+# macOS系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 线上部署文件
+*.pyc
+*.pyo
+*.mo
+*.pot 
