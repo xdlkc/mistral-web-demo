@@ -80,6 +80,9 @@
                     <i class="bi bi-x"></i>
                 </button>
             </div>
+            <div class="small text-muted mb-1">
+                <i class="bi bi-info-circle"></i> 提示：您可以直接粘贴图片(Ctrl+V)或点击图片图标选择文件
+            </div>
             <div class="input-group">
                 {{ image_form.message(class="form-control", placeholder="关于图片的问题...", id="imageChatMessage", autocomplete="off") }}
                 <label for="image" class="btn btn-secondary">
@@ -258,6 +261,49 @@
                 };
                 
                 reader.readAsDataURL(this.files[0]);
+            }
+        });
+        
+        // 粘贴图片功能
+        document.addEventListener('paste', function(e) {
+            // 只有图片模式下才处理粘贴事件
+            if (document.getElementById('imageChatForm').classList.contains('d-none')) {
+                return;
+            }
+            
+            // 检查粘贴的数据是否包含图片
+            const items = e.clipboardData.items;
+            let imageFile = null;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    imageFile = items[i].getAsFile();
+                    break;
+                }
+            }
+            
+            if (imageFile) {
+                e.preventDefault();
+                
+                const reader = new FileReader();
+                const preview = document.getElementById('uploadPreview');
+                const previewContainer = document.querySelector('.image-preview');
+                const imageInput = document.getElementById('image');
+                
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    previewContainer.classList.remove('d-none');
+                    
+                    // 创建一个新的File对象以便于提交
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(imageFile);
+                    imageInput.files = dataTransfer.files;
+                    
+                    // 聚焦消息输入框
+                    document.getElementById('imageChatMessage').focus();
+                };
+                
+                reader.readAsDataURL(imageFile);
             }
         });
         
