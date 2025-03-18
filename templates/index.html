@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="chat-container d-flex flex-column h-100">
+<div class="chat-container">
     <div class="chat-header bg-light p-3 d-flex justify-content-between align-items-center">
         <h4>与 Mistral AI 对话</h4>
     </div>
     
-    <div class="chat-messages flex-grow-1 p-3 overflow-auto" id="chatMessages">
+    <div class="chat-messages" id="chatMessages">
         {% if chat and chat.messages %}
             {% for message in chat.messages %}
                 <div class="message {% if message.role == 'user' %}user-message{% else %}assistant-message{% endif %} mb-3">
                     <div class="message-header">
-                        <strong>{{ '你' if message.role == 'user' else 'Mistral AI' }}</strong>
-                        <small class="text-muted">{{ message.timestamp }}</small>
+                        <div class="d-flex flex-column">
+                            <strong>{{ '你' if message.role == 'user' else 'Mistral AI' }}</strong>
+                            <small class="text-muted message-time">{{ message.timestamp }}</small>
+                        </div>
                     </div>
                     <div class="message-content">
                         {% if '[图片]' in message.content and message.role == 'user' %}
@@ -46,7 +48,7 @@
         {% endif %}
     </div>
     
-    <div class="chat-input-container p-3 border-top">
+    <div class="chat-input-container">
         <!-- 切换按钮放在输入框上方 -->
         <div class="chat-type-toggle mb-2 d-flex justify-content-end">
             <div class="btn-group btn-group-sm" role="group">
@@ -137,9 +139,22 @@
             });
         });
         
-        // 聊天区域滚动到底部
+        // 添加清除浮动元素到现有消息
         const chatMessages = document.getElementById('chatMessages');
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        // 先清除已有的清除浮动元素，避免重复
+        document.querySelectorAll('.clear-float').forEach(el => el.remove());
+        // 在每个消息后添加清除浮动元素
+        document.querySelectorAll('.message').forEach(function(msg) {
+            const clearDiv = document.createElement('div');
+            clearDiv.className = 'clear-float';
+            clearDiv.style.clear = 'both';
+            msg.after(clearDiv);
+        });
+        
+        // 聊天区域滚动到底部
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 100);
         
         // 切换聊天表单
         document.getElementById('toggleTextChat').addEventListener('click', function() {
@@ -323,15 +338,25 @@
         const messageHeader = document.createElement('div');
         messageHeader.className = 'message-header';
         
+        const headerContainer = document.createElement('div');
+        headerContainer.className = 'd-flex flex-column';
+        
         const headerText = document.createElement('strong');
         headerText.textContent = role === 'user' ? '你' : (role === 'assistant' ? 'Mistral AI' : '系统');
         
         const timestamp = document.createElement('small');
-        timestamp.className = 'text-muted';
-        timestamp.textContent = new Date().toLocaleTimeString();
+        timestamp.className = 'text-muted message-time';
         
-        messageHeader.appendChild(headerText);
-        messageHeader.appendChild(timestamp);
+        // 格式化时间为更易读的格式：HH:MM:SS
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        timestamp.textContent = `${hours}:${minutes}:${seconds}`;
+        
+        headerContainer.appendChild(headerText);
+        headerContainer.appendChild(timestamp);
+        messageHeader.appendChild(headerContainer);
         
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
@@ -361,7 +386,20 @@
         }
         
         chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // 添加清除浮动元素以确保布局正确
+        const clearDiv = document.createElement('div');
+        clearDiv.style.clear = 'both';
+        chatMessages.appendChild(clearDiv);
+        
+        // 使用setTimeout确保DOM完全更新后再滚动
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            // 聚焦输入框
+            const activeForm = document.getElementById('textChatForm').classList.contains('d-none') ?
+                document.getElementById('imageChatMessage') : document.getElementById('textChatMessage');
+            activeForm.focus();
+        }, 100);
         
         return messageDiv;
     }
