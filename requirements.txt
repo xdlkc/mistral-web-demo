@@ -1,5 +1,5 @@
 flask==2.3.3
-mistralai==0.0.12
+mistralai==0.25.2
 flask-wtf==1.2.1
 python-dotenv==1.0.0
 Pillow==10.0.0 

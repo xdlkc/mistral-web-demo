@@ -103,8 +103,8 @@ def image_chat():
             # 保存图片
             image.save(filepath)
             
-            # 添加用户消息，包括图片信息
-            user_message = f"[图片] {message}"
+            # 添加用户消息，包括图片文件名（供前端显示使用）
+            user_message = f"[图片] {unique_filename} {message}"
             chat_history.add_message(chat_id, 'user', user_message)
             
             # 获取聊天历史
@@ -120,7 +120,7 @@ def image_chat():
                 return jsonify({
                     'status': 'success', 
                     'response': response, 
-                    'image_path': filepath.replace('\\', '/').replace(app.static_folder, '')
+                    'image_path': os.path.basename(filepath)
                 })
             except Exception as e:
                 return jsonify({'status': 'error', 'message': str(e)})
@@ -158,4 +158,4 @@ def delete_chat(chat_id):
     return jsonify({'status': 'error', 'message': '删除失败'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5001)
